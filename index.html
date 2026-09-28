@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SkillBridge – Internship Discovery</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+:root{--ink:#14213d;--sea:#0b6e6e;--sun:#ffc93c}
+body{background:#f7f9fb;color:var(--ink)}
+.navbar{background:var(--ink)}
+.navbar-brand{font-weight:800}.navbar-brand span{color:var(--sun)}
+.hero{background:var(--sea);color:#fff;padding:3rem 0 4rem;border-bottom:6px solid var(--sun)}
+.hero h1{font-weight:800;max-width:18ch;letter-spacing:-.02em}
+.panel{background:#fff;border:1px solid #dfe6ec;border-radius:10px;padding:1rem}
+.filters{margin-top:-2rem;box-shadow:0 8px 24px rgba(20,33,61,.08)}
+.job{background:#fff;border:1px solid #dfe6ec;border-left:5px solid var(--sea);border-radius:6px;padding:1rem 1.2rem;height:100%}
+.chip{display:inline-block;background:#e6f2f2;color:var(--sea);border-radius:99px;padding:.15rem .7rem;font-size:.8rem;margin:0 .25rem .25rem 0}
+.chip.have{background:var(--sea);color:#fff}
+.match{font-weight:800;color:var(--sea);white-space:nowrap}
+.btn-sea{background:var(--sea);color:#fff;border:0}.btn-sea:hover{background:#095858;color:#fff}
+.btn-sun{background:var(--sun);color:var(--ink);font-weight:700;border:0}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-dark"><div class="container">
+  <a class="navbar-brand" href="#">Skill<span>Bridge</span></a>
+  <span class="text-white-50 small" id="appliedCount"></span>
+</div></nav>
+
+<section class="hero"><div class="container">
+  <h1>Turn the skills you have into the internship you want.</h1>
+  <p class="mt-3 mb-0" style="max-width:52ch">Tick your skills below. Every internship shows how well you match and what you still need to learn.</p>
+</div></section>
+
+<main class="container pb-5">
+  <div class="panel filters row g-2 mb-4 mx-0">
+    <div class="col-md-5"><input id="q" class="form-control" placeholder="Search role, company or city" aria-label="Search"></div>
+    <div class="col-6 col-md-3"><select id="mode" class="form-select" aria-label="Mode">
+      <option value="">Any mode</option><option>Remote</option><option>On-site</option><option>Hybrid</option></select></div>
+    <div class="col-6 col-md-2 d-flex align-items-center"><div class="form-check">
+      <input class="form-check-input" type="checkbox" id="paid"><label class="form-check-label" for="paid">Paid only</label></div></div>
+    <div class="col-md-2"><select id="sort" class="form-select" aria-label="Sort">
+      <option value="match">Best match</option><option value="stipend">Highest stipend</option></select></div>
+  </div>
+
+  <div class="row g-4">
+    <aside class="col-lg-3">
+      <div class="panel">
+        <h6 class="fw-bold">My skills</h6>
+        <div id="skills"></div>
+        <button class="btn btn-sm btn-outline-secondary mt-2" id="clear">Clear skills</button>
+      </div>
+    </aside>
+    <section class="col-lg-9"><div class="row g-3" id="list"></div></section>
+  </div>
+</main>
+
+<div class="modal fade" id="applyModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title" id="mTitle"></h5><button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+  <div class="modal-body">
+    <label class="form-label" for="mName">Your name</label><input id="mName" class="form-control mb-2">
+    <label class="form-label" for="mEmail">Email</label><input id="mEmail" type="email" class="form-control mb-2">
+    <label class="form-label" for="mNote">Short note</label><textarea id="mNote" class="form-control" rows="3"></textarea>
+  </div>
+  <div class="modal-footer"><button class="btn btn-sun" id="mSend">Send application</button></div>
+</div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ---- Edit this list to add your own internships ----
+const INTERNSHIPS = [
+ {id:1,title:"Python Backend Intern",company:"Nimbus Labs",city:"Ahmedabad",mode:"Hybrid",stipend:12000,skills:["Python","Django","SQL"]},
+ {id:2,title:"Frontend Developer Intern",company:"PixelCraft",city:"Remote",mode:"Remote",stipend:8000,skills:["HTML","CSS","JavaScript","Bootstrap"]},
+ {id:3,title:"Data Analyst Intern",company:"Metric Works",city:"Bengaluru",mode:"On-site",stipend:15000,skills:["Python","SQL","Excel","Statistics"]},
+ {id:4,title:"Content & SEO Intern",company:"Growthly",city:"Remote",mode:"Remote",stipend:0,skills:["Writing","SEO"]},
+ {id:5,title:"UI/UX Design Intern",company:"Studio Nine",city:"Pune",mode:"Hybrid",stipend:10000,skills:["Figma","UX Research","CSS"]},
+ {id:6,title:"Machine Learning Intern",company:"Vector AI",city:"Hyderabad",mode:"On-site",stipend:20000,skills:["Python","Machine Learning","Statistics"]}
+];
+
+const ALL_SKILLS = [...new Set(INTERNSHIPS.flatMap(i => i.skills))].sort();
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+let mySkills = new Set(load("sb_skills", []));
+let applied  = load("sb_applied", []);
+let current = null;
+const $ = id => document.getElementById(id);
+const modal = new bootstrap.Modal($("applyModal"));
+
+function renderSkills() {
+  $("skills").innerHTML = ALL_SKILLS.map(s =>
+    `<div class="form-check"><input class="form-check-input" type="checkbox" id="s_${s}" value="${s}" ${mySkills.has(s) ? "checked" : ""}>
+     <label class="form-check-label" for="s_${s}">${s}</label></div>`).join("");
+  document.querySelectorAll("#skills input").forEach(cb => cb.onchange = () => {
+    cb.checked ? mySkills.add(cb.value) : mySkills.delete(cb.value);
+    save("sb_skills", [...mySkills]); render();
+  });
+}
+
+function matchPct(i) {
+  return Math.round(100 * i.skills.filter(s => mySkills.has(s)).length / i.skills.length);
+}
+
+function render() {
+  const q = $("q").value.toLowerCase().trim(), mode = $("mode").value, paid = $("paid").checked;
+  let items = INTERNSHIPS.filter(i =>
+    (!q || (i.title + i.company + i.city).toLowerCase().includes(q)) &&
+    (!mode || i.mode === mode) && (!paid || i.stipend > 0));
+  items.sort($("sort").value === "stipend" ? (a, b) => b.stipend - a.stipend : (a, b) => matchPct(b) - matchPct(a));
+
+  $("list").innerHTML = items.length ? items.map(i => {
+    const done = applied.some(a => a.id === i.id);
+    const missing = i.skills.filter(s => !mySkills.has(s));
+    return `<div class="col-md-6"><article class="job d-flex flex-column">
+      <div class="d-flex justify-content-between gap-2">
+        <h5 class="mb-1">${i.title}</h5>
+        <span class="match">${matchPct(i)}% match</span>
+      </div>
+      <div class="text-secondary mb-2">${i.company} · ${i.city} · ${i.mode}</div>
+      <div class="mb-2">${i.skills.map(s => `<span class="chip ${mySkills.has(s) ? "have" : ""}">${s}</span>`).join("")}</div>
+      <small class="mb-3">${i.stipend ? "₹" + i.stipend.toLocaleString("en-IN") + "/month" : "Unpaid"}
+        ${missing.length ? " · Learn: " + missing.join(", ") : " · You have every skill"}</small>
+      <div class="mt-auto">${done
+        ? `<button class="btn btn-secondary btn-sm" disabled>Applied</button>`
+        : `<button class="btn btn-sea btn-sm" onclick="openApply(${i.id})">Apply</button>`}</div>
+    </article></div>`;
+  }).join("") : `<p class="text-center text-secondary py-5">No internships match. Clear a filter or try a broader search.</p>`;
+
+  $("appliedCount").textContent = applied.length ? `${applied.length} application${applied.length > 1 ? "s" : ""} sent` : "";
+}
+
+function openApply(id) {
+  current = INTERNSHIPS.find(i => i.id === id);
+  $("mTitle").textContent = current.title + " · " + current.company;
+  modal.show();
+}
+
+$("mSend").onclick = () => {
+  const name = $("mName").value.trim(), email = $("mEmail").value.trim();
+  if (!name || !email) { alert("Please enter your name and email."); return; }
+  applied.push({id: current.id, name, email, note: $("mNote").value, date: new Date().toISOString()});
+  save("sb_applied", applied);
+  modal.hide(); render();
+};
+
+$("clear").onclick = () => { mySkills.clear(); save("sb_skills", []); renderSkills(); render(); };
+["q", "mode", "paid", "sort"].forEach(id => $(id).addEventListener("input", render));
+
+renderSkills(); render();
+</script>
+</body>
+</html>
